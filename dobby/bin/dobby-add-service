@@ -1,0 +1,85 @@
+#!/bin/bash
+
+function dobby-add-service() {
+	function dobby_get_server(){
+		echo 'blighted-glacier'
+	}
+	function dobby_get_ssh(){
+		echo "ssh vagrant@47.48.49.91"
+	}
+
+	local server=$(dobby_get_server)
+	local ssh=$(dobby_get_ssh)
+
+	local service=$1
+	if test -z "$service"; then
+		echo "Usage: dobby-add-service SERVICE [ARGS...]"
+		echo "Available services:"
+		for f in $(echo $DOBBY_ROOT/services/* | sort); do
+			echo "    $(basename "$f" | sed -e s/.sh$// -e s/.d$// )" >&2
+		done
+		echo "Aborting" >&2
+		return 1
+	fi
+	shift
+
+	if test -e "$DOBBY_ROOT/services/$service.sh" || test -e "$DOBBY_ROOT/services/$service.d"; then
+		echo -n
+	else
+		echo "Service '$service' not found!" >&2
+		echo "Run without arguments to list available services." >&2
+		echo "Aborting." >&2
+		return 1
+	fi
+
+	echo "-----> Using container $server"
+	local tempdir=$($ssh "
+		temp=\$(mktemp -d)
+		mkdir -p \"\$temp/services\"
+		echo \$temp
+	")
+	echo "-----> Loading dobby to $tempdir"
+	rsync -rzcv $DOBBY_ROOT/lib -e "$ssh" :$tempdir/ | indent
+	rsync -rzcv $DOBBY_ROOT/services/$service* -e "$ssh" :$tempdir/services/ | indent
+	echo "-----> Installing service '$service'"
+	local defaults=$($ssh "
+		set -e
+		for f in $tempdir/lib/*.sh; do
+			source \$f
+		done
+		cd $tempdir/services/
+		test -e $service.sh && source $service.sh
+		test -e $service.d && for f in $service.d/*; do
+			source \$f
+		done
+		install-$service
+	")
+
+	echo "-----> Service '$service' installed with default properties:"
+	echo "$defaults" | sed s/^/$server:$service./g | indent
+
+	mkdir -p dobby.config/$server
+	echo "$defaults" | sed s/^/$service./g > dobby.config/$server/$service.properties
+
+	echo "-----> Refreshing dobby config"
+	rsync -rzcv dobby.config -e "$ssh" :$tempdir/ | indent
+
+	$ssh "
+		set -e
+		export DOBBY_SERVER=blighted-glacier
+		export DOBBY_ROOT=$tempdir
+		for f in $tempdir/lib/*.sh; do
+			source \$f
+		done
+		cd $tempdir/services
+		test -e $service.sh && source $service.sh
+		test -e $service.d && for f in $service.d/*; do
+			source \$f
+		done
+		echo \"-----> Configuring service 'postgres'\"
+		configure-$service
+		echo \"-----> Starting service 'postgres'\"
+		start-$service
+	"
+
+}

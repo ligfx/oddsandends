@@ -1,0 +1,7 @@
+function install_ruby1.9() {
+	apt-get install -y ruby1.9.3
+	gem install bundler
+}
+function uninstall_ruby1.9() {
+	apt-get remove ruby1.9.3 --auto-remove
+}

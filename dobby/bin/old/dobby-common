@@ -1,0 +1,60 @@
+#!/bin/bash
+
+set -e
+
+function assert_args() {
+	# assert_args USAGE ARGS...
+	local usage="$1"
+	local num_args=$(split_count_ws "$usage")
+	if test "$#" != $(($num_args + 1)); then
+		echo "USAGE: $usage" >&2
+		exit 1
+	fi
+}
+
+function split_count_ws() {
+	# split_count_ws STR > NUM
+	echo "$1" | tr -s " " | grep -o " " | wc -l
+}
+
+function dwc() {
+	read | wc $@ | tr -d " "
+}
+
+function url_is_git() {
+	assert_args "url_is_git URL" $@
+	local url="$1"
+	test ! -z $( echo "$url" | grep ".git$" )
+}
+
+function package_require_all() {
+	local script=""
+	for package in $@; do
+		script="$script
+			$(package_require $package)
+		"
+	done
+	echo "$script"
+}
+
+function package_require() {
+	assert_args "package_require NAME" $@
+	local name=$1
+	cat <<SCRIPT
+echo "Installing package '$name'..."
+SCRIPT
+	if test "$name" = "ruby1.9"; then
+		cat <<SCRIPT
+test "\$(dpkg -l ruby1.9.3 | head -n 6 | tail -n 1 | cut -c 1-2)" == "ii" || sudo apt-get install -y ruby1.9.3
+gem list -i bundler >/dev/null || sudo gem install bundler
+SCRIPT
+	elif test "$name" = "buildtools"; then
+		cat <<SCRIPT
+test "\$(dpkg -l build-essential | head -n 6 | tail -n 1 | cut -c 1-2)" == "ii" || sudo apt-get install -y build-essential
+test "\$(dpkg -l make | head -n 6 | tail -n 1 | cut -c 1-2)" == "ii" || sudo apt-get install -y make
+SCRIPT
+	else
+		echo "Package '$name' not found!" >&2
+		exit 1
+	fi
+}

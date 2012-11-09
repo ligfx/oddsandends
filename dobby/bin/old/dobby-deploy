@@ -1,0 +1,67 @@
+#!/bin/bash
+
+
+. dobby-common
+PATH="$(dirname $0):$PATH"
+assert_args "dobby-deploy SRC" $@
+SRC=$1
+
+if ! url_is_git "$SRC"; then
+	echo "Only Git repositories are supported right now, sorry!"
+	exit 1
+fi
+SERVICE_NAME="$(basename $SRC | sed s/.git$//)"
+
+if test -e ".dobby"; then
+	. .dobby
+	echo "Dobby is managing server with '$SSH'"
+else
+	echo "Please run in a managed dobby directory."
+	exit 1
+fi
+
+echo "Deploying git repository '$SRC'..."
+GIT_BRANCH="master"
+echo "Using default branch 'master'..."
+GIT_REF="$(git ls-remote $SRC refs/heads/$GIT_BRANCH)"
+if test -z "$GIT_REF"; then
+	echo "Could not find ref 'refs/heads/$GIT_BRANCH'" >&2
+	echo "Available refs:" >&2
+	git ls-remote "$SRC" >&2
+	exit 1
+fi
+GIT_VERSION=$(echo "$GIT_REF" | cut -c1-7)
+
+echo "Cloning version '$GIT_VERSION'..."
+mkdir -p tmp/git/
+ID=$(date +%s)
+git clone $SRC tmp/git/$ID >/dev/null
+
+deploy_git_sanitize "tmp/git/$ID"
+deploy_macosx_sanitize "tmp/git/$ID"
+cd tmp/git/$ID
+if test -e "Gemfile"; then
+	if test -e "config.ru"; then
+		echo "Detected Ruby/Rack app!"
+		cd - >/dev/null
+		$SSH "$(package_require_all buildtools ruby1.9)"
+		echo "Installing service '$SERVICE_NAME'..."
+		deploy_remote_push "$SERVICE_NAME" tmp/git/$ID "$ID" "$SSH"
+		deploy_remote_bundler_install "$SERVICE_NAME" "$SSH"
+		echo "Configuring service '$SERVICE_NAME'..."
+		#DATABASE_URL=$(deploy_remote_postgres "analytics" "$SSH")
+		ENV="DATABASE_URL=\"postgres:/\""
+		echo "Starting service '$SERVICE_NAME'..."
+		deploy_remote_unicorn "$SERVICE_NAME" "$SSH" "$ENV"
+		#echo "Status of service '$SERVICE_NAME': OK"
+		echo "Service '$SERVICE_NAME' started with resources:"
+		echo "  PORT=80"
+	else
+		echo "Detected Ruby app!"
+		echo "(Currently unsupported)"
+		exit 1
+	fi
+else
+	echo "No buildpack matched!">&2
+	exit 1
+fi

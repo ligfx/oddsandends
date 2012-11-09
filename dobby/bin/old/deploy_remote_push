@@ -1,0 +1,45 @@
+#!/bin/bash
+
+# deploy_remote_push APP LOCAL ID SSH
+APP=$1
+LOCAL=$2
+ID=$3
+SSH=$4
+
+DIR="sites/$APP"
+VERSIONS="$DIR/versions"
+
+$SSH "
+set -e
+
+mkdir -p $VERSIONS
+LATEST_VERSION=\$(ls $VERSIONS | sort -n -r | head -n 1)
+if test ! -z \"\$LATEST_VERSION\"; then
+	LATEST_REV=\$(echo \$LATEST_VERSION | cut -d "-" -f 1)
+	LATEST_ID=\$(echo \$LATEST_VERSION | cut -d "-" -f 2)
+	echo \"[Deploy] Current version: \$LATEST_REV at \$LATEST_ID\" >&2
+fi
+
+if test ! -z \"\$LATEST_VERSION\"; then
+	NEW_REV=\$((\$LATEST_REV + 1))
+else
+	NEW_REV="1"
+fi
+echo \"[Deploy] Updating to \$NEW_REV at $ID...\" >&2
+
+cd $VERSIONS
+if test ! -z \"\$LATEST_VERSION\"; then
+	cp -r \$LATEST_VERSION \$NEW_REV-$ID
+else
+	mkdir \$NEW_REV-$ID
+fi
+
+cd \$NEW_REV-$ID
+mkdir -p ../../shared
+ln -sf ../../shared
+cd ../..
+rm -f current
+ln -s versions/\$NEW_REV-$ID current
+"
+
+rsync -az --delete --exclude "shared" -e "$SSH" -r "$LOCAL/" "$REMOTE:$DIR/current/" >&2

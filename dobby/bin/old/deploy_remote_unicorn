@@ -1,0 +1,34 @@
+#!/bin/bash
+
+# deploy_remote_unicorn APP SSH ENV
+APP=$1
+SSH=$2
+ENV=$3
+
+$SSH "
+cd sites/$APP
+
+set -e
+
+if test -e shared/tmp/unicorn.pid; then
+	echo \"[Deploy] Sending HUP to Unicorn...\" >&2
+	sudo kill -HUP \$(cat shared/tmp/unicorn.pid)
+else
+	mkdir -p shared/tmp
+	if test ! -e shared/unicorn.conf; then
+		echo \"[Deploy] Writing Unicorn conf..\" >&2
+		cat > shared/unicorn.conf <<CONF
+worker_processes 2
+pid \"\$PWD/shared/tmp/unicorn.pid\"
+stderr_path \"\$PWD/shared/tmp/unicorn.log\"
+stdout_path \"\$PWD/shared/tmp/unicorn.log\"
+preload_app false
+working_directory \"\$PWD/current\"
+CONF
+	fi
+	echo \"[Deploy] Starting unicorn..\" >&2
+	cd current
+	sudo $ENV bundle exec unicorn -p 80 -E production -c shared/unicorn.conf -D
+fi
+
+"

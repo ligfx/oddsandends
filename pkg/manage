@@ -1,0 +1,83 @@
+#!/usr/bin/env ruby
+
+require 'pp'
+
+class Dir
+  def self.parents(s)
+    s = File.join Dir.getwd, s unless s =~ /$\//
+    dirs = [s]
+    until s == '/'
+      dirs << (s = File.dirname s)
+    end
+    dirs
+  end
+end
+
+class Object
+  def with
+    yield self
+  end
+end
+
+class Repository
+  def initialize(dir)
+    @dir = dir
+    @cache = {}
+  end
+  def find(name)
+    return @cache[name] if @cache[name]
+    
+    if Dir["#{@dir}/*"].include? "#{@dir}/#{name}"
+      @cache[name] = Package.new(File.join(@dir, name))
+      @cache[name]
+    else
+      raise Exception, "Couldn't find package '#{name}'"
+    end
+  end
+end
+
+class Package
+  def initialize(dir)
+    @dir, @pkgfile = Package.find_root(dir)
+    raise Exception, "Couldn't find Pkgfile" if not @dir
+    @deps = File.open(@pkgfile, 'r') { |f| f.lines.map &:strip }
+  end
+  
+  def all_deps(repo)
+    (@deps.map do |d|
+      repo.find(d).all_deps(repo)
+    end << self).flatten.uniq
+  end
+  
+  def setup
+    lib = File.join(@dir, 'lib')
+    ENV['LIBRARY_PATH'] = lib + ":" + ENV['LIBRARY_PATH'].to_s
+    ENV['LD_LIBRARY_PATH'] = lib + ":" + ENV['LD_LIBRARY_PATH'].to_s
+    ENV['DYLD_LIBRARY_PATH'] = lib + ":" + ENV['DYLD_LIBRARY_PATH'].to_s
+    #puts "lib: " + lib
+    
+    inc = File.join(@dir, 'include')
+    ENV['CPATH'] = inc + ":" + ENV['CPATH'].to_s
+    #puts "include: " + inc
+  end
+  
+  def self.find_root(dir)
+    Dir.parents(dir).find do |d|
+      File.exists? File.join(d, "Pkgfile")
+    end.with do |d|
+      d = File.expand_path(d)
+      [d, (File.join(d, "Pkgfile") if d)]
+    end
+  end
+end
+
+if __FILE__ == $0
+  r = Repository.new File.dirname(__FILE__)
+  p = Package.new Dir.getwd
+  deps = p.all_deps(r)
+  deps.delete(p)
+  deps.each do |dep|
+    dep.setup
+  end
+  system(*ARGV)
+end

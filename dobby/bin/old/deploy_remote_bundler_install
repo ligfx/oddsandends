@@ -1,0 +1,25 @@
+#!/bin/bash
+
+set -e
+
+# deploy_remote_bundler_install APP SSH
+APP=$1
+SSH=$2
+
+DIR="sites/$APP/current"
+
+$SSH "
+	set -e
+
+	BUNDLER=\"\$(which bundle)\"
+	if test -z \"\$BUNDLER\"; then
+		echo \"[Deploy] ERROR: 'bundle' not found\" >&2
+		echo \"[Deploy] ERROR: Aborting!\" >&2
+		exit 2
+	fi
+
+	cd $DIR
+	mkdir -p vendor shared/vendor/bundle
+	test ! -e \"vendor/bundle\" && ln -fs ../shared/vendor/bundle vendor/
+	bundle install --deployment
+"

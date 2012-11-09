@@ -1,0 +1,9 @@
+#!/bin/bash
+
+# deploy_git_sanitize $DIR
+DIR=$1
+
+echo "[Deploy] Cleaning Git artifacts..." >&2
+cd $DIR
+rm -fr .git >&2
+rm -f .gitignore >&2

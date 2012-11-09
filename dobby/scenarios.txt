@@ -1,0 +1,65 @@
+Flow:
+
+* Install postgres
+* Configure postgres
+* Export blighted-glacier:postgres{user,password,port}
+* Run postgres
+
+* Install Rails app
+* Add resource 'postgres'
+* Configure Rails app
+* Run Rails app
+
+* Stop everything
+
+* Set blighted-glacier:postgres.port = 9000
+* Reconfigure everything!
+
+Two possibilities:
+1. Postgres first, rails second
+   * Set postgres.port = 9000
+   * Configure postgres
+   * Running on 9000
+   * Configure Rails app
+   * Detects postgres.port = 9000
+   * Everything works!
+2. Rails first, postgres second
+   * Set postgres.port = 9000
+   * Configure Rails app
+   * Detects postgres.port = 9000
+   * Configure postgres
+   * Running on 9000
+   * Everything works!
+
+---
+
+Another scenario:
+
+Let Postgres and Rails be running on a single VM. Stop all services, then remove Postgres from that VM.
+
+Bring up another VM in the cluster and install Postgres. Before, where "*:postgres" belonged to the first VM, it now belongs to the second VM.
+
+Reconfigure everything. Postgres reads its cluster config keys on "second-vm:postgres" and uses them. Rails finds "*:postgres" at "second-vm:postgres" and writes a database.yml file accordingly.
+
+Everything works.
+
+---
+
+These scenarios assume that cluster properties for a service exist before the service has been configured. Services therefore need to expose default properties before they are configured. In the install method? Yes.
+
+Scenario:
+
+Bring up a VM, let it be named "blighted-glacier". Install Postgres on "blighted-glacier". Dobby runs apt-get, everything works correctly, and the install script responds with a set of default properties (probably from scraping configuration files). Dobby adds these properties to the cluster config.
+
+Deploy a Rails app from GitHub. Dobby notices "script/rails" and runs the Rails buildpack.
+
+The users asks Dobby to configure and start the cluster. Postgres configures itself, reading (its default) properties from the cluster. The Rails app configures itself, notices that the "pg" gem is installed, and tries to find "*:postgres" in the cluster. It finds "blighted-glacier:postgres{user,password,port}", and writes a database.yml file accordingly.
+
+
+---
+
+
+Configuration priorities:
+* Default config, per service/node: "blighted-glacier.postgres.port"
+* Override global config: "postgres.port"
+* Override node config, per service/node

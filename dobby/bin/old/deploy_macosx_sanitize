@@ -1,0 +1,8 @@
+#!/bin/bash
+
+# deploy_macosx_sanitize $DIR
+DIR=$1
+
+echo "[Deploy] Cleaning Mac OS X artifacts..." >&2
+cd $DIR
+find . | grep .DS_Store | xargs rm

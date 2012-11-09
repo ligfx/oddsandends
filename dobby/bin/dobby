@@ -1,0 +1,38 @@
+#!/bin/bash
+
+set -e
+export DOBBY_ROOT="$(dirname $0)/.."
+
+if test ! -e "$DOBBY_ROOT/lib"; then
+	echo "Missing lib/ directory! Should be in:" >&2
+	echo "    $DOBBY_ROOT/lib" >&2
+	echo "Aborting" >&2
+	exit 1
+fi
+
+
+for f in $DOBBY_ROOT/lib/*.sh; do
+	source $f;
+done
+
+CMD="$1"
+if test -z "$CMD"; then
+	echo "Usage: dobby COMMAND [ARGUMENTS]" >&2
+	echo "Available commands:" >&2
+	for f in $(echo $DOBBY_ROOT/bin/dobby-* | sort); do
+		echo "    $(basename "$f" | sed s/^dobby-//)" >&2
+	done
+	echo "Aborting" >&2
+	exit 1
+fi
+shift
+
+if test ! -e "$DOBBY_ROOT/bin/dobby-$CMD"; then
+	echo "Command '$CMD' not found!" >&2
+	echo "Run with no arguments to see available commands."
+	echo "Aborting" >&2
+	exit 1
+fi
+
+source "$DOBBY_ROOT/bin/dobby-$CMD"
+dobby-$CMD $@

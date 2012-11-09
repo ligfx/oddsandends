@@ -1,0 +1,40 @@
+#!/bin/bash
+
+set -e
+export DOBBY_ROOT="/dobby"
+
+for f in $DOBBY_ROOT/**/*.sh $DOBBY_ROOT/**/**/*.sh; do
+  source $f
+done
+
+if test "$1" == "deploy"; then
+	assert_args "dobby deploy BASE" $@
+
+	BASE="$2"
+	echo "$BASE"
+	SHORTNAME=$(basename "$BASE")
+	mkdir -p /dobby/deploy/$SHORTNAME
+	cd /dobby/deploy/$SHORTNAME
+	ID=$(date +%s)
+	mkdir -p versions/$ID
+	ln -fs versions/$ID current
+	cd current
+	cp -r $BASE/* .
+	# dobby_git_clone "$REPO" "master"
+	dobby_deploy_symlink_shared
+	dobby_buildpack_install_for "$SHORTNAME"
+	echo "-----> Configuring $SHORTNAME"
+	configure_$SHORTNAME
+	exit
+fi
+if test "$1" == "service"; then
+	assert_args "dobby service NAME COMMAND" $@
+	NAME="$2"
+	COMMAND="$3"
+	cd /dobby/deploy/$NAME/current
+	${COMMAND}_${NAME}
+	exit
+fi
+
+assert_args "dobby COMMAND" $@
+$1

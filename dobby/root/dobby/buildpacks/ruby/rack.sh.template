@@ -1,0 +1,23 @@
+function configure_$$APP(){
+	dobby_buildpack_rack_configure
+}
+
+function start_$$APP(){
+	dobby_buildpack_rack_start
+}
+
+function restart_$$APP(){
+	dobby_buildpack_rack_restart
+}
+
+function stop_$$APP(){
+	dobby_buildpack_rack_stop
+}
+
+function status_$$APP(){
+	dobby_buildpack_rack_status
+}
+
+function log_$$APP(){
+	dobby_buildpack_rack_log
+}

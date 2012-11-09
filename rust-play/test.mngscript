@@ -1,0 +1,30 @@
+Variable(managerVar, 0.0)
+Variable(somethingElse, 47.5)
+
+Effect(LeftPiano) {
+	Stage {
+		Volume(4.5) Pan(-1.0) Delay(0.4)
+	}
+	Stage {
+		Volume(Random(4, 6))
+	}
+}
+
+Track(UpperTemple) {
+	FadeIn(5)
+	FadeOut(5)
+	
+	LoopLayer (Hi) {
+		Variable(temp, 0.0)
+		Variable(counter, 0.0)
+		UpdateRate(0.1)
+		Wave(HighBreathG)
+		Update {
+			// Gradually, pan around at a random rate
+			temp = Random(0.0, 0.1)
+			counter = Add(counter, temp)
+			Pan = CosineWave(counter, 30)
+			
+		}
+	}
+}
